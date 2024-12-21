@@ -24,7 +24,7 @@
 #include <ti/drivers/GPIO.h>
 #include <ti/drivers/gpio/GPIOCC32XX.h>
 
-#define CONFIG_GPIO_COUNT 3
+#define CONFIG_GPIO_COUNT 4
 
 /*
  *  ======== gpioPinConfigs ========
@@ -37,6 +37,8 @@ GPIO_PinConfig gpioPinConfigs[] = {
     GPIOCC32XX_GPIO_22 | GPIO_DO_NOT_CONFIG,
     /* CONFIG_GPIO_LED_0 : LaunchPad LED D10 (Red) */
     GPIOCC32XX_GPIO_09 | GPIO_CFG_OUT_STD | GPIO_CFG_OUT_STR_MED | GPIO_CFG_OUT_LOW,
+    /* CONFIG_GPIO_LED_1 : LaunchPad LED D8 (Green) */
+    GPIOCC32XX_GPIO_11 | GPIO_CFG_OUT_STD | GPIO_CFG_OUT_STR_MED | GPIO_CFG_OUT_LOW,
 };
 
 /*
@@ -54,11 +56,14 @@ GPIO_CallbackFxn gpioCallbackFunctions[] = {
     NULL,
     /* CONFIG_GPIO_LED_0 : LaunchPad LED D10 (Red) */
     NULL,
+    /* CONFIG_GPIO_LED_1 : LaunchPad LED D8 (Green) */
+    NULL,
 };
 
 const uint_least8_t CONFIG_GPIO_BUTTON_0_CONST = CONFIG_GPIO_BUTTON_0;
 const uint_least8_t CONFIG_GPIO_BUTTON_1_CONST = CONFIG_GPIO_BUTTON_1;
 const uint_least8_t CONFIG_GPIO_LED_0_CONST = CONFIG_GPIO_LED_0;
+const uint_least8_t CONFIG_GPIO_LED_1_CONST = CONFIG_GPIO_LED_1;
 
 /*
  *  ======== GPIOCC32XX_config ========
@@ -66,57 +71,10 @@ const uint_least8_t CONFIG_GPIO_LED_0_CONST = CONFIG_GPIO_LED_0;
 const GPIOCC32XX_Config GPIOCC32XX_config = {
     .pinConfigs = (GPIO_PinConfig *)gpioPinConfigs,
     .callbacks = (GPIO_CallbackFxn *)gpioCallbackFunctions,
-    .numberOfPinConfigs = 3,
-    .numberOfCallbacks = 3,
+    .numberOfPinConfigs = 4,
+    .numberOfCallbacks = 4,
     .intPriority = (~0)
 };
-
-/*
- *  =============================== I2C ===============================
- */
-
-#include <ti/drivers/I2C.h>
-#include <ti/drivers/i2c/I2CCC32XX.h>
-#include <ti/devices/cc32xx/inc/hw_ints.h>
-#include <ti/devices/cc32xx/inc/hw_memmap.h>
-
-#define CONFIG_I2C_COUNT 1
-
-/*
- *  ======== i2cCC32XXObjects ========
- */
-I2CCC32XX_Object i2cCC32XXObjects[CONFIG_I2C_COUNT];
-
-/*
- *  ======== i2cCC32XXHWAttrs ========
- */
-const I2CCC32XX_HWAttrsV1 i2cCC32XXHWAttrs[CONFIG_I2C_COUNT] = {
-    /* CONFIG_I2C_0 */
-    /* LaunchPad I2C */
-    {
-        .baseAddr = I2CA0_BASE,
-        .intNum = INT_I2CA0,
-        .intPriority = (~0),
-        .sclTimeout = 0x0,
-        .clkPin  = I2CCC32XX_PIN_01_I2C_SCL,
-        .dataPin = I2CCC32XX_PIN_02_I2C_SDA
-    },
-};
-
-/*
- *  ======== I2C_config ========
- */
-const I2C_Config I2C_config[CONFIG_I2C_COUNT] = {
-    /* CONFIG_I2C_0 */
-    /* LaunchPad I2C */
-    {
-        .object = &i2cCC32XXObjects[CONFIG_I2C_0],
-        .hwAttrs = &i2cCC32XXHWAttrs[CONFIG_I2C_0]
-    },
-};
-
-const uint_least8_t CONFIG_I2C_0_CONST = CONFIG_I2C_0;
-const uint_least8_t I2C_count = CONFIG_I2C_COUNT;
 
 /*
  *  =============================== Power ===============================
@@ -197,51 +155,6 @@ const Timer_Config Timer_config[CONFIG_TIMER_COUNT] = {
 
 const uint_least8_t CONFIG_TIMER_0_CONST = CONFIG_TIMER_0;
 const uint_least8_t Timer_count = CONFIG_TIMER_COUNT;
-
-/*
- *  =============================== UART ===============================
- */
-
-#include <ti/drivers/UART.h>
-#include <ti/devices/cc32xx/inc/hw_ints.h>
-#include <ti/devices/cc32xx/inc/hw_memmap.h>
-#include <ti/drivers/uart/UARTCC32XX.h>
-
-#define CONFIG_UART_COUNT 1
-
-#define UART0_BASE UARTA0_BASE
-#define UART1_BASE UARTA1_BASE
-#define INT_UART0  INT_UARTA0
-#define INT_UART1  INT_UARTA1
-
-
-static unsigned char uartCC32XXRingBuffer0[32];
-UARTCC32XX_Object uartCC32XXObjects0;
-
-static const UARTCC32XX_HWAttrsV1 uartCC32XXHWAttrs0 = {
-    .baseAddr           = UART0_BASE,
-    .intNum             = INT_UART0,
-    .intPriority        = (~0),
-    .flowControl        = UARTCC32XX_FLOWCTRL_NONE,
-    .ringBufPtr         = uartCC32XXRingBuffer0,
-    .ringBufSize        = sizeof(uartCC32XXRingBuffer0),
-    .rxPin              = UARTCC32XX_PIN_45_UART0_RX,
-    .txPin              = UARTCC32XX_PIN_62_UART0_TX,
-    .ctsPin             = UARTCC32XX_PIN_UNASSIGNED,
-    .rtsPin             = UARTCC32XX_PIN_UNASSIGNED,
-    .errorFxn           = NULL
-  };
-
-const UART_Config UART_config[CONFIG_UART_COUNT] = {
-    {   /* CONFIG_UART_0 */
-        .fxnTablePtr = &UARTCC32XX_fxnTable,
-        .object      = &uartCC32XXObjects0,
-        .hwAttrs     = &uartCC32XXHWAttrs0
-    },
-};
-
-const uint_least8_t CONFIG_UART_0_CONST = CONFIG_UART_0;
-const uint_least8_t UART_count = CONFIG_UART_COUNT;
 
 #include <ti/drivers/power/PowerCC32XX.h>
 

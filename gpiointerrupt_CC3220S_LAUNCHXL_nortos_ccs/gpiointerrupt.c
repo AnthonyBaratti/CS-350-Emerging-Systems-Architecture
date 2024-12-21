@@ -35,7 +35,6 @@
  */
 #include <stdint.h>
 #include <stddef.h>
-#include <stdio.h>
 
 /* Driver Header files */
 #include <ti/drivers/GPIO.h>
@@ -46,456 +45,246 @@
 /* Timer header files*/
 #include <ti/drivers/Timer.h>
 
-// I2C header files
-#include <ti/drivers/I2C.h>
-
-// UART header files
-#include <ti/drivers/UART.h>
-#include <ti/display/Display.h>
-
-
-
 /*
- * Display configuration
+ * Two separate switch cases will keep track of the same 2 states.
+ * The Message_State switch case will create functionality (output) for the message to the LEDs
+ * The Button_Press switch case will control the transitions (input) between each Message_State
  *
- * ##FIXME I can't get this to work
- * Resource:
- * https://software-dl.ti.com/ecs/SIMPLELINK_CC32XX_SDK/2_40_01_01/exports/docs/tidrivers/doxygen/html/_display_8h.html
  */
+enum Message_States {Message_SOS, Message_OK} Button_Press, Message_State;
 
 /*
-Display_Handle display;
-Display_Params displayParams;
-void initDisplay(void){
-    Display_init();  
-    Display_Params_init(&displayParams);  
-    display = Display_open(Display_Type_UART, &displayParams);  
-
-    if (display == NULL) {  
-        while (1); // Handle initialization failure  
-    }  
-}*/
-
-
-#define DISPLAY(x) UART_write(uart, &output, x);
-// UART Global Variables
-char output[64];
-int bytesToSend;
+ *  This allows the GPIO write to be pre-defined for the red and green LEDs
+ *  When LED_State_SM() is called, it will be called for the current iteration of the
+ *  pre-defined message array every 500ms until the array is finished.
+ *
+ *  (See LED_States sosMsgArray & LED_States okMsgArray)
+ */
+enum LED_States {Red_On, Green_On, RG_OFF} LED_State;
 
 /*
- *  UART configuration
+ *  This state machine will be used by timerCallback function to light
+ *  LEDs 500ms at a time
  */
-// Driver Handles - Global variables
-UART_Handle uart;
-UART_Params uartParams;
-void initUART(void)
-{
-
-    // Init the driver
-    UART_init();
-    // Configure the driver
-    UART_Params_init(&uartParams);
-    uartParams.writeDataMode = UART_DATA_TEXT;
-    uartParams.readDataMode = UART_DATA_TEXT;
-    uartParams.readEcho = UART_ECHO_OFF;
-    uartParams.readReturnMode = UART_RETURN_FULL;
-    uartParams.baudRate = 115200;
-    // Open the driver
-    uart = UART_open(CONFIG_UART_0, &uartParams);
-    if (uart == NULL) {
-        /* UART_open() failed */
-        while (1);
+void LED_State_SM(){
+    switch (LED_State){
+    case (Red_On):
+        GPIO_write(CONFIG_GPIO_LED_1, CONFIG_GPIO_LED_OFF); //Green off
+        GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_ON); //red on
+        break;
+    case (Green_On):
+        GPIO_write(CONFIG_GPIO_LED_1, CONFIG_GPIO_LED_ON); //Green on
+        GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_OFF); //red off
+        break;
+    case (RG_OFF):
+        GPIO_write(CONFIG_GPIO_LED_1, CONFIG_GPIO_LED_OFF); //Green off
+        GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_OFF); //red off
+        break;
+    default:
+        break;
     }
-
 }
-
 
 
 /*
- *  I2C Configuration
+ *  This is an array of states designed to be read in order with each timerCallback (500 milliseconds)
+ *  Will be iterated and output with LED_State_SM() method in the Message_SOS switch case
  *
- *
- *
+ *  SOS Message (dot dot dot, dash dash dash, dot dot dot)
  */
-// I2C Global Variables
-static const struct {
-    uint8_t address;
-    uint8_t resultReg;
-    char *id;
-}
+enum LED_States sosMsgArray [] = {
+    //dot dot dot (S) 1500ms pause
+    Red_On, RG_OFF, Red_On, RG_OFF, Red_On, RG_OFF, RG_OFF, RG_OFF,
 
-sensors[3] = {
-{ 0x48, 0x0000, "11X" },
-{ 0x49, 0x0000, "116" },
-{ 0x41, 0x0001, "006" }
+    //dash dash dash (O) 1500ms pause
+    Green_On, Green_On, Green_On, RG_OFF,
+    Green_On, Green_On, Green_On, RG_OFF,
+    Green_On, Green_On, Green_On, RG_OFF,RG_OFF, RG_OFF,
+
+    //dot dot dot (S) 1500ms pause
+    Red_On, RG_OFF, Red_On, RG_OFF, Red_On, RG_OFF, RG_OFF, RG_OFF,
+
+    //2000ms pause to fit 3500 ms per word gap
+    RG_OFF, RG_OFF, RG_OFF, RG_OFF
 };
 
-uint8_t txBuffer[1];
-uint8_t rxBuffer[2];
-I2C_Transaction i2cTransaction;
+/*
+ *  This is an array designed to be read in order with each timerCallBack (500 milliseconds)
+ *  Will be iterated and output with LED_State_SM() in the Message_OK switch case
+ *
+ *  OK message (dash dash dash, dot dash dot)
+ */
+enum LED_States okMsgArray [] = {
+    //dash dash dash (O) 1500ms pause
+    Green_On, Green_On, Green_On, RG_OFF,
+    Green_On, Green_On, Green_On, RG_OFF,
+    Green_On, Green_On, Green_On, RG_OFF, RG_OFF, RG_OFF,
 
-// Driver Handles - Global variables
-I2C_Handle i2c;
+    //dot dash dot (K) 1500ms pause
+    Red_On, RG_OFF,
+    Green_On, Green_On, Green_On, RG_OFF,
+    Red_On, RG_OFF, RG_OFF, RG_OFF,
 
-// Make sure you call initUART() before calling this function.
-void initI2C(void)
+    //2000 ms pause to fit 3500ms per word gap
+    RG_OFF, RG_OFF, RG_OFF, RG_OFF
+};
+
+/*
+ *  This variable will be used to keep track of the array position with each timerCallBack
+ *  Progressing the state read in the array by 1 until the end is reached (every 500 ms)
+ */
+unsigned int i = 0;
+
+
+
+/*
+ * Message_State_SM():
+ *
+ *  Each respective case will iterate through its respective MsgArray, using LED_State_SM() to call
+ *     the LED that is suppose to be lit (red, green, or neither). Then it increments the iterator variable (i)
+ *     and checks to see if the end of the Array has been reached before checking the
+ *     transition state (if the button was pressed, the transition state changed
+ *     /if the button was not pressed, transition to same state). If the array is finished
+ *     the iterator variable is reset to zero (to start at the beginning of whichever array will be used)
+ *     and the Message_State transitions to whichever Button_State is active. Using the if statement
+ *     check at the end of each recursive call allows the message to be fully displayed before transitioning
+ *     to a new (or the same) state.
+ *
+ *     Called in timerCallback() Method to execute every 500ms
+ *     Functionality: Display SOS/OK Messages.
+ *
+ */
+
+void Message_State_SM(){
+    //STATES START
+    switch (Message_State) {
+
+        case (Message_SOS):
+                //Set state from the array position
+                LED_State = sosMsgArray[i];
+
+                //execute the state of the ith position
+                LED_State_SM();
+
+                i += 1; //increment the position
+
+                /*
+                 *  To iterate to the end of the array, we increment size with each iteration
+                 *  Best practice not to use for loops within embedded systems to prevent locking
+                 *  so the increment is done within the state switch case and is replayed
+                 *  by the timerCallBack function (recursive every 500ms)
+                 *  C offers no length check of arrays, so this snippet of code was used from:
+                 *
+                 *  Lemonaki, K. (2022, December 5). How to find the size of an array
+                 *      in C with the sizeof operator. Freecodecamp.org.
+                 *      https://www.freecodecamp.org/news/how-to-find-the-size-of-an-array-in-c-with-the-sizeof-operator/
+                 */
+
+                if (i == (sizeof(sosMsgArray)/sizeof(sosMsgArray[0]))){
+                    i = 0; //reset to read array from beginning
+
+                    /*
+                     *  This statement is held within the if statement to allow the entire message to
+                     *  finish being displayed. Once the MsgArray has reached its end, the counter
+                     *  gets reset to 0, and the Message_State can transition to a new message if
+                     *  if the button was pressed. If the button was not pressed, repeat Message_State.
+                     */
+
+                    Message_State = Button_Press;  //loads Message_State with current Button_Press transition.
+                }
+            break;
+        case (Message_OK):
+                  //Set message array position
+                  LED_State = okMsgArray[i];
+
+                  //Use the state of the ith position
+                  LED_State_SM();
+
+                  i += 1; //increment the position
+
+                  //i has reached the end of array (Lemonaki, 2022).
+                  if (i == (sizeof(okMsgArray)/sizeof(okMsgArray[0]))){
+                      //reset to read array from beginning.
+                      i = 0;
+
+                      //loads Message_State with current Button_Press transition
+                      Message_State = Button_Press;
+                   }
+            break;
+        default:
+            break;
+    } //STATES END
+}
+
+
+
+/*
+ *  This switch case is designed as a transition state machine.
+ *  Since transitions are based solely on input (button push) it is
+ *  implemented within the gpioButtonFxn0 function.
+ *
+ *  The Message_State switch case only reads the Button_Press state after the
+ *  MsgArray has completely finished displaying the current message. Then
+ *  the Message_State transitions to the Button_Press (even if it did not change).
+ *
+ *  Called in:
+ *  gpioButtonFxn0()
+ *  gpioButtonFxn1()
+ *
+ *  Functionality: Manage transitions between Message_States
+ */
+
+void Button_State_SM() {
+
+    //TRANSITIONS START
+    switch (Button_Press) {
+        case Message_SOS:
+            Button_Press = Message_OK;
+            break;
+        case Message_OK:
+            Button_Press = Message_SOS;
+            break;
+        default:
+            break;
+    } //TRANSITIONS END
+}
+
+
+/*
+ *  Timer interrupt for GPIO
+ *  Initialized to 500ms recursive.
+ *  Operates a switch case (Message_State) to switch between the two messages (SOS and OK)
+ *  The gpioButtonFxn0() function will determine which state is used (a press changes the state)
+ *  This is simply the functionality (not the transitions).
+ */
+void timerCallBack (Timer_Handle myHandle, int_fast16_t status)
 {
-    int8_t i, found;
-    I2C_Params i2cParams;
-    DISPLAY(snprintf(output, 64, "Initializing I2C Driver - "));
-
-    // Init the driver
-    I2C_init();
-
-    // Configure the driver
-    I2C_Params_init(&i2cParams);
-    i2cParams.bitRate = I2C_400kHz;
-
-    // Open the driver
-    i2c = I2C_open(CONFIG_I2C_0, &i2cParams);
-    if (i2c == NULL)
-    {
-        DISPLAY(snprintf(output, 64, "Failed\n\r"));
-        while (1);
-    }
-    DISPLAY(snprintf(output, 32, "Passed\n\r"));
-    // Boards were shipped with different sensors.
-    // Welcome to the world of embedded systems.
-    // Try to determine which sensor we have.
-    // Scan through the possible sensor addresses
-    /* Common I2C transaction setup */
-    i2cTransaction.writeBuf = txBuffer;
-    i2cTransaction.writeCount = 1;
-    i2cTransaction.readBuf = rxBuffer;
-    i2cTransaction.readCount = 0;
-    found = false;
-    for (i=0; i<3; ++i)
-    {
-        i2cTransaction.slaveAddress = sensors[i].address;
-        txBuffer[0] = sensors[i].resultReg;
-        DISPLAY(snprintf(output, 64, "Is this %s? ", sensors[i].id));
-        if (I2C_transfer(i2c, &i2cTransaction))
-        {
-            DISPLAY(snprintf(output, 64, "Found\n\r"));
-            found = true;
-            break;
-        }
-        DISPLAY(snprintf(output, 64, "No\n\r"));
-    }
-    if(found)
-    {
-        DISPLAY(snprintf(output, 64, "Detected TMP%s I2C address: "
-                "%x\n\r", sensors[i].id, i2cTransaction.slaveAddress));
-    }
-    else
-    {
-        DISPLAY(snprintf(output, 64, "Temperature sensor not found, contact professor\n\r"));
-    }
+    //used to display message through LEDs
+    Message_State_SM();
 }
 
-int16_t readTemp(void)
-{
-    int j;
-    int16_t temperature = 0;
-    i2cTransaction.readCount = 2;
-    if (I2C_transfer(i2c, &i2cTransaction))
-    {
-        /*
-         * Extract degrees C from the received data;
-         * see TMP sensor datasheet
-         */
-        temperature = (rxBuffer[0] << 8) | (rxBuffer[1]);
-        temperature *= 0.0078125;
-        /*
-         * If the MSB is set '1', then we have a 2's complement
-         * negative value which needs to be sign extended
-         */
-        if (rxBuffer[0] & 0x80)
-        {
-            temperature |= 0xF000;
-        }
-    }
-    else
-    {
-        DISPLAY(snprintf(output, 64, "Error reading temperature sensor "
-                "(%d)\n\r",i2cTransaction.status));
-        DISPLAY(snprintf(output, 64, "Please power cycle your board by unplugging"
-                " USB and plugging back in.\n\r"));
-    }
-    return temperature;
-}
-
-/*  Define a structure for all tasks shared variables
- *  ALL Tasks will have state, period, elapsed time, and their
- *  unique response function (SM)
- */
-typedef struct task {
-    int state;                  //Current State of task
-    unsigned long period;       //Rate at which the task should tick
-    unsigned long elapsedTime;  //Time since tasks previous tick
-    int (*TickFct) (int);       //Call task tick function
-} task;
-
-// Set number of tasks, read temp, write display, button press, LED out
-task tasks [4];
-const unsigned char numTasks = 4;
-
-/*
- *  These timer variables will be used to determine periods.
- *  The GCD will be set to the same as the timerCallBack function
- *  all times are represented as milliseconds (Based off the GCD
- *  and timerCallBack period). Each variable will be attached
- *  to their appropriate task within main.
- */
-const unsigned int timerGCD = 100;          //GCD of all period checks (200, 500, 1000)
-const unsigned int buttonTimer = 200;       //period for button check
-const unsigned int tempTimer = 500;         //period for temp check
-const unsigned int displayTimer = 1000;     //period for display output
-
-//Initialize variables to be used for data manipulation
-int setPoint = 0;      //default starting temp in Celsius (68 degrees F)
-int heat = 0;           //return value of heat. 1 is on, 0 is off.
-int temperature;        //current temperature value
-int seconds = 0;        //time program has been running
-
-//Initialize button flags
-int setTempDown= 0;
-int setTempUp = 0;
-
-/*
- *  This Task Manager is the heart of the task scheduler
- *  It is designed to iterate through all of the tasks in round robin, checking
- *  each period to the elapsed time. If the elapsed time has passed the period check,
- *  the state changes based on the SMs for each task.
- *
- *  The task manager will be called by the timerCallBack function every GCD (100 ms)
- */
-void TaskManager(){
-    unsigned char i;
-    for (i = 0; i < numTasks; ++i){   //Cycles through each task every GCD
-        if (tasks[i].elapsedTime >= tasks[i].period) {  //Checks elapsed time
-            tasks[i].state = tasks[i].TickFct(tasks[i].state); //sets state if time has elapsed
-            tasks[i].elapsedTime = 0; //reset elapsed time
-        }
-        tasks[i].elapsedTime += timerGCD;
-    }
-}
-
-/*
- *  Button States and Button SM declarations
- */
-enum Button_States {Btn_Wait, Btn_Increase, Btn_Decrease} Button_State;
-int TickFct_Button(int state);
-
-/*
- *  This SM drives the button checks. The Wait state determines the transition.
- *  If the setDownTemp is activated with left board button, the state changes to
- *  Btn_Decrease.
- *  If the setUpTemp is actived with the right board button, the state changes
- *  to Btn_Increase.
- *  Then the state is reset to Btn_Wait & the button variable
- *   for the timer to check for the next button press.
- *  This SM will be called every time the elapsedTime surpasses the buttonTimer (200ms)
- *  It will also adjust the setPoint variable to display the current setting of the
- *  thermostat through the UART/I2C
- *
- * @params: current Button_State
- * @return: updated Button_State
- *
- */
-int TickFct_Button(int state) {
-    switch(state){ //Button State Start
-        case Btn_Wait:
-            //no state action for wait, continue to wait for task manager
-            break;
-        case Btn_Increase:
-            setPoint += 1;      //raise setPoint degree by 1
-            setTempUp = 0;      //reset button flag
-            state = Btn_Wait;   //wait for next task manager call
-            break;
-        case Btn_Decrease:
-            setPoint -= 1;      //lower setPoint degree by 1
-            setTempDown = 0;    //reset button flag
-            state = Btn_Wait;   //wait for next task manager call
-            break;
-        default:
-            break;
-    }//Button State end
-
-    switch(state){ //Button Transitions start
-        case Btn_Wait:
-            if (setTempUp == 1) {
-                state = Btn_Increase;
-            }
-            else if (setTempDown == 1){
-                state = Btn_Decrease;
-            }
-            else {
-                state = Btn_Wait; //if no buttons pressed, remain in wait state
-            }
-            break;
-        default:
-            break;
-    } //Button transitions end
-    return state;
-}
-
-/*
- *  LED States and SM function declarations
- */
-enum LED_States {LED_On, LED_Off} LED_State;
-int TickFct_LED(int state);
-
-
-/*
- *  This SM is designed to operate the LED. It will be called
- *  everytime the elapsedTime is greater than the displayTimer.
- *  The transition states compare the current temperature
- *  with the setPoint, and turns the LED on or off according
- *  to the transitions.
- *
- * @params: current LED_State
- * @return: updated LED_State
- */
-int TickFct_LED(int state) {
-    temperature = readTemp();
-    switch(state) { //LED States start
-        case LED_On:
-            GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_ON);  //heater on
-            break;
-        case LED_Off:
-            GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_OFF); //heater off
-            break;
-        default:
-            break;
-    }//LED States end
-
-    switch(state) { //LED transitions start
-        case LED_On:
-            if (temperature > setPoint){    //Actual temp is higher than set temp
-                state = LED_Off;            //turn heater off
-            }
-            break;
-        case LED_Off:
-            if (temperature < setPoint){    //Actual temp is lower than set temp
-                state = LED_On;              //turn heater on
-            }
-            break;
-    } //LED transitions end
-    return state;
-}
-
-
-//Display message SM and Declarations
-enum Message_States {Msg_Wait, Msg_Display} Msg_State;
-int TickFct_Display(int state);
-
-/*
- *  This SM is designed to print the display readings
- *  of temperature, setPoint, LED, and operating time.
- *  It will be called from the task manager every time
- *  the elapsedTime is greater than displayTimer (1 second)
- *
- * @params: current Msg_State
- * @return: updated Msg_State
- */
-int TickFct_Display(int state){
-    switch(state) { //Display State Start
-        case Msg_Wait:
-            //No state actions for wait
-            break;
-        case Msg_Display:
-            seconds += 1;   //tracking operation runtime, increase with each task manager call
-
-            //Displays output using UART
-            DISPLAY(snprintf(output, 64, "<%02d,%02d,%d,%04d>\n\r", temperature, setPoint, heat, seconds))
-            break;
-    } //Display State End
-
-    switch(state) { //Display Transition Start
-        case Msg_Wait:
-            state = Msg_Display;
-            break;
-        case Msg_Display:
-            state = Msg_Wait; //Waits to be called again by task manager.
-            break;
-    } //Display Transition End
-    return state;
-}
-
-//Temperature States and SM Declarations
-enum Temperature_States {Tmp_Wait, Tmp_Read} Tmp_State;
-int TickFct_Temp(int state);
-
-/*
- * This SM is designed to read the temperature and set
- * the temperature variable to the current temperature of the room.
- * This variable will be used in the display, and as a check against
- * setPoint in the LED (heater) SM
- *
- * @params: current Tmp_State
- * @return: updated Tmp_State
- */
-int TickFct_Temp(int state){
-    switch(state){ //Temperature State start
-        case Tmp_Wait:
-            //No state for wait
-            break;
-        case Tmp_Read:
-            temperature = readTemp(); //reads temperature from sensor
-            break;
-        default:
-            break;
-    } //Temperature State end
-
-    switch(state){ //Temperature Transitions start
-        case Tmp_Wait:
-            state = Tmp_Read;
-            break;
-        case Tmp_Read:
-            state = Tmp_Wait; //waits to be called again by task manager
-            break;
-        default:
-            break;
-    } //Temp transitions end
-    return state;
-}
-
-
-volatile unsigned char timerFlag = 0;
-void timerCallback(Timer_Handle myHandle, int_fast16_t status)
-{
-    timerFlag = 1;
-}
-
-/*
- * Timer Interrupt for GPIO
- * The timerCallBack will be called every 100 milliseconds (GCD of all timers)
- * It will call the task manager, which will iterate through all of the tasks
- * (read temp, write display, button check, LED(heat)).
- */
-
-Timer_Handle timer0; //Global timer variable
 void initTimer(void)
 {
+    Timer_Handle timer0;
     Timer_Params params;
-    // Init the driver
+
     Timer_init();
-    // Configure the driver
     Timer_Params_init(&params);
-    params.period = 100000; //task GCD
+    params.period = 500000; //set to 500 milliseconds
     params.periodUnits = Timer_PERIOD_US;
-    params.timerMode = Timer_CONTINUOUS_CALLBACK;
-    params.timerCallback = timerCallback;
-    // Open the driver
-    timer0 = Timer_open(CONFIG_TIMER_0, &params);
+    params.timerMode = Timer_CONTINUOUS_CALLBACK; //Non-blocking callback
+    params.timerCallback = timerCallBack;
+
+    timer0 = Timer_open (CONFIG_TIMER_0, &params);
+
     if (timer0 == NULL) {
-        /* Failed to initialized timer */
+        /*Failed to initialized timer*/
         while (1) {}
     }
+
     if (Timer_start(timer0) == Timer_STATUS_ERROR) {
-        /* Failed to start timer */
-        while (1) {}
+        /* Failed to start timer*/
+            while (1) {}
     }
 }
 
@@ -506,12 +295,10 @@ void initTimer(void)
  *
  *  Note: GPIO interrupts are cleared prior to invoking callbacks.
  */
-
-
-//Reduce set temperature
 void gpioButtonFxn0(uint_least8_t index)
 {
-    setTempDown = 1;
+    //used to detect button input and determine transition
+    Button_State_SM();
 }
 
 /*
@@ -521,13 +308,10 @@ void gpioButtonFxn0(uint_least8_t index)
  *
  *  Note: GPIO interrupts are cleared prior to invoking callbacks.
  */
-
-//Increase set temperature
 void gpioButtonFxn1(uint_least8_t index)
 {
-    char messageOn[]="Button 1 press";
-    UART_write(uart, messageOn, sizeof(messageOn));
-    setTempUp = 1;
+    //used to detect button input and determine transition
+    Button_State_SM();
 }
 
 
@@ -537,68 +321,37 @@ void gpioButtonFxn1(uint_least8_t index)
 void *mainThread(void *arg0)
 {
     /* Call driver init functions */
-
-    initUART();
-    initI2C();
-    //initDisplay();
     GPIO_init();
-
-    /*
-     *  Configure the LED and button pins
-     */
+    initTimer();
+    /* Configure the LED and button pins */
     GPIO_setConfig(CONFIG_GPIO_LED_0, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
+    GPIO_setConfig(CONFIG_GPIO_LED_1, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
     GPIO_setConfig(CONFIG_GPIO_BUTTON_0, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
-    GPIO_setConfig(CONFIG_GPIO_BUTTON_1, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
+
+    /* Turn on user LED */
+    //GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_ON);
 
     /* Install Button callback */
-    GPIO_setCallback(CONFIG_GPIO_BUTTON_0, gpioButtonFxn0);;
-    GPIO_setCallback(CONFIG_GPIO_BUTTON_1, gpioButtonFxn1);;
+    GPIO_setCallback(CONFIG_GPIO_BUTTON_0, gpioButtonFxn0);
+
     /* Enable interrupts */
     GPIO_enableInt(CONFIG_GPIO_BUTTON_0);
-    GPIO_enableInt(CONFIG_GPIO_BUTTON_1);
 
-    GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_OFF);
+    //Initialize states.
+    Message_State = Button_Press;
+
     /*
-     *  These sets of variables construct each task for
-     *  the task manager to use. each task will iterate with every
-     *  call of the callBackTimer (100ms). The TaskManager function will
-     *  then check each period to the elapsed time, and change the state of
-     *  each task if the elapsed time is geq to the tasks specified period.
-     *  The task will then perform is designated action, then
-     *  reset its elapsed time if it was geq, or
-     *  increment the elapsed time of the task by the GCD
+     *  If more than one input pin is available for your device, interrupts
+     *  will be enabled on CONFIG_GPIO_BUTTON1.
      */
-    unsigned char i = 0;
-    //Task 1: Button Function
-    tasks[i].state = Btn_Wait; //Default until first read
-    tasks[i].period = buttonTimer;
-    tasks[i].elapsedTime = tasks[i].period;
-    tasks[i].TickFct = &TickFct_Button;
-    ++i;
-    //Task 2: LED (heater) control
-    tasks[i].state = LED_Off; //Default until first read
-    tasks[i].period = displayTimer;
-    tasks[i].elapsedTime = tasks[i].period;
-    tasks[i].TickFct = &TickFct_LED;
-    ++i;
-    //Task 3: Display message
-    tasks[i].state = Msg_Wait; //Default until first read
-    tasks[i].period = displayTimer;
-    tasks[i].elapsedTime = tasks[i].period;
-    tasks[i].TickFct = &TickFct_Display;
-    ++i;
-    //Task 4: Temperature reading
-    tasks[i].state = Tmp_Wait; //Default until first read
-    tasks[i].period = tempTimer;
-    tasks[i].elapsedTime = tasks[i].period;
-    tasks[i].TickFct = &TickFct_Temp;
+    if (CONFIG_GPIO_BUTTON_0 != CONFIG_GPIO_BUTTON_1) {
+        /* Configure BUTTON1 pin */
+        GPIO_setConfig(CONFIG_GPIO_BUTTON_1, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
 
-    initTimer();
-    while(1){
-
-        if(timerFlag){
-            TaskManager();
-            timerFlag=0;
-        }
+        /* Install Button callback */
+        GPIO_setCallback(CONFIG_GPIO_BUTTON_1, gpioButtonFxn1);
+        GPIO_enableInt(CONFIG_GPIO_BUTTON_1);
     }
+
+    return (NULL);
 }

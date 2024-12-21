@@ -46,7 +46,10 @@ extern const uint_least8_t              CONFIG_GPIO_BUTTON_1_CONST;
 /* P64, LaunchPad LED D10 (Red) */
 extern const uint_least8_t              CONFIG_GPIO_LED_0_CONST;
 #define CONFIG_GPIO_LED_0               2
-#define CONFIG_TI_DRIVERS_GPIO_COUNT    3
+/* P02, LaunchPad LED D8 (Green) */
+extern const uint_least8_t              CONFIG_GPIO_LED_1_CONST;
+#define CONFIG_GPIO_LED_1               3
+#define CONFIG_TI_DRIVERS_GPIO_COUNT    4
 
 /* LEDs are active high */
 #define CONFIG_GPIO_LED_ON  (1)
@@ -57,56 +60,12 @@ extern const uint_least8_t              CONFIG_GPIO_LED_0_CONST;
 
 
 /*
- *  ======== I2C ========
- */
-
-/*
- *  SCL: P01
- *  SDA: P02
- *  LaunchPad I2C
- */
-extern const uint_least8_t              CONFIG_I2C_0_CONST;
-#define CONFIG_I2C_0                    0
-#define CONFIG_TI_DRIVERS_I2C_COUNT     1
-
-/* ======== I2C Addresses and Speeds ======== */
-#include <ti/drivers/I2C.h>
-
-/* ---- CONFIG_I2C_0 I2C bus components ---- */
-
-/* BMA222E address and max speed */
-#define CONFIG_I2C_0_BMA222E_ADDR     (0x18)
-#define CONFIG_I2C_0_BMA222E_MAXSPEED (400U) /* Kbps */
-
-/* TMP006 address and max speed */
-#define CONFIG_I2C_0_TMP006_ADDR     (0x41)
-#define CONFIG_I2C_0_TMP006_MAXSPEED (3400U) /* Kbps */
-
-/* CONFIG_I2C_0 max speed (supported by all components) */
-#define CONFIG_I2C_0_MAXSPEED   (3400U) /* Kbps */
-#define CONFIG_I2C_0_MAXBITRATE ((I2C_BitRate)I2C_3400kHz)
-
-
-/*
  *  ======== Timer ========
  */
 
 extern const uint_least8_t                  CONFIG_TIMER_0_CONST;
 #define CONFIG_TIMER_0                      0
 #define CONFIG_TI_DRIVERS_TIMER_COUNT       1
-
-/*
- *  ======== UART ========
- */
-
-/*
- *  TX: P62
- *  RX: P45
- */
-extern const uint_least8_t              CONFIG_UART_0_CONST;
-#define CONFIG_UART_0                   0
-#define CONFIG_TI_DRIVERS_UART_COUNT    1
-
 
 /*
  *  ======== Board_init ========

@@ -12,18 +12,10 @@ gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/includ
 gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
 gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stddef.h
-gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdio.h
-gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdarg.h
 gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/GPIO.h
 gpiointerrupt.obj: syscfg/ti_drivers_config.h
 gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/devices/DeviceFamily.h
-gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/I2C.h
-gpiointerrupt.obj: C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
-gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/dpl/HwiP.h
-gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/dpl/SemaphoreP.h
 gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/Timer.h
-gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/UART.h
-gpiointerrupt.obj: C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/display/Display.h
 
 ../gpiointerrupt.c:
 
@@ -49,27 +41,11 @@ C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
 C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stddef.h:
 
-C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdio.h:
-
-C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdarg.h:
-
 C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/GPIO.h:
 
 syscfg/ti_drivers_config.h:
 
 C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/devices/DeviceFamily.h:
 
-C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/I2C.h:
-
-C:/ti/ccs1010/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
-
-C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/dpl/HwiP.h:
-
-C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/dpl/SemaphoreP.h:
-
 C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/Timer.h:
-
-C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/drivers/UART.h:
-
-C:/ti/simplelink_cc32xx_sdk_4_30_00_06/source/ti/display/Display.h:
 
