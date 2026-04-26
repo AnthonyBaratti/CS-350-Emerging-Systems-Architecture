@@ -18,4 +18,4 @@ This microcontroller is designed to mock an in home thermostat system. Is uses a
 
 ## State Machine Diagram
 [Thermostat State Machine](https://github.com/AnthonyBaratti/CS-350-Emerging-Systems-Architecture/blob/main/Final%20Project.drawio.pdf)<br><br>
-[Return to top](#CS-350-Emerging-Systems-Architecture)
+
