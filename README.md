@@ -1,6 +1,7 @@
 # CS-350-Emerging-Systems-Architecture
 
-A project developed in C programming language, this project (CC3220S_Thermostat_nortos_css) uses a microcontroller to mock an in home thermostat which would be connected to a smart system and programmable database.
+A project developed in C programming language, this project (CC3220S_Thermostat_nortos_css) uses a microcontroller to mock an in home thermostat which would be connected to a smart system and programmable database. <br><br>
+[Return to eportfolio](#https://github.com/AnthonyBaratti/AnthonyBaratti.github.io)
 
 ## Features
 - Read current temperature of the room
